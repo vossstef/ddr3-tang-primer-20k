@@ -391,8 +391,8 @@ always@(posedge clk)begin
         8'd2: `print(addr_read[15:0], 2);
         8'd3: `print("=", STR);
         8'd4: `print(actual, 2);
-//        8'd5: `print(" ", STR);
-//        8'd6: `print(actual128[127:0], 16);      // print everything for debug
+        8'd5: `print(" ", STR);
+        8'd6: `print(actual128[127:0], 16);      // print everything for debug
         endcase
         print_counters <= print_counters == 8'd255 ? 0 : print_counters + 1;
     end
