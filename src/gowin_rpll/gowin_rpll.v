@@ -1,22 +1,25 @@
-//Copyright (C)2014-2022 Gowin Semiconductor Corporation.
+//Copyright (C)2014-2024 Gowin Semiconductor Corporation.
 //All rights reserved.
 //File Title: IP file
-//GOWIN Version: V1.9.8.07
+//Tool Version: V1.9.10 (64-bit)
 //Part Number: GW2A-LV18PG256C8/I7
-//Device: GW2A-18C
-//Created Time: Sat Sep 17 22:58:08 2022
+//Device: GW2A-18
+//Device Version: C
+//Created Time: Sun Jul 21 23:00:32 2024
 
-module Gowin_rPLL (clkout, clkoutp, lock, clkoutd, clkin);
+module Gowin_rPLL (clkout, lock, clkoutp, clkoutd, clkin);
 
 output clkout;
-output clkoutp;
 output lock;
+output clkoutp;
 output clkoutd;
 input clkin;
 
 wire clkoutd3_o;
+wire gw_vcc;
 wire gw_gnd;
 
+assign gw_vcc = 1'b1;
 assign gw_gnd = 1'b0;
 
 rPLL rpll_inst (
@@ -34,26 +37,16 @@ rPLL rpll_inst (
     .ODSEL({gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd,gw_gnd}),
     .PSDA({gw_gnd,gw_gnd,gw_gnd,gw_gnd}),
     .DUTYDA({gw_gnd,gw_gnd,gw_gnd,gw_gnd}),
-    .FDLY({gw_gnd,gw_gnd,gw_gnd,gw_gnd})
+    .FDLY({gw_vcc,gw_vcc,gw_vcc,gw_vcc})
 );
-
-// clkout @ 499.5 Mhz
-//defparam rpll_inst.FBDIV_SEL = 36;
-//defparam rpll_inst.IDIV_SEL = 1;
-//defparam rpll_inst.ODIV_SEL = 2;
-
-// clkout @ 398.25 Mhz
-defparam rpll_inst.FBDIV_SEL = 58;
-defparam rpll_inst.IDIV_SEL = 3;
-defparam rpll_inst.ODIV_SEL = 2;
-
-// clkoutd @ 1/4 * clkout
-defparam rpll_inst.DYN_SDIV_SEL = 4;
 
 defparam rpll_inst.FCLKIN = "27";
 defparam rpll_inst.DYN_IDIV_SEL = "false";
+defparam rpll_inst.IDIV_SEL = 2;
 defparam rpll_inst.DYN_FBDIV_SEL = "false";
+defparam rpll_inst.FBDIV_SEL = 34;
 defparam rpll_inst.DYN_ODIV_SEL = "false";
+defparam rpll_inst.ODIV_SEL = 2;
 defparam rpll_inst.PSDA_SEL = "0100";
 defparam rpll_inst.DYN_DA_EN = "false";
 defparam rpll_inst.DUTYDA_SEL = "1000";
@@ -65,6 +58,7 @@ defparam rpll_inst.CLKFB_SEL = "internal";
 defparam rpll_inst.CLKOUT_BYPASS = "false";
 defparam rpll_inst.CLKOUTP_BYPASS = "false";
 defparam rpll_inst.CLKOUTD_BYPASS = "false";
+defparam rpll_inst.DYN_SDIV_SEL = 4;
 defparam rpll_inst.CLKOUTD_SRC = "CLKOUT";
 defparam rpll_inst.CLKOUTD3_SRC = "CLKOUT";
 defparam rpll_inst.DEVICE = "GW2A-18C";

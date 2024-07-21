@@ -132,13 +132,16 @@ assign DDR3_CK = ck;
 assign DDR3_nCS = 1'b0;
 
 assign dout128 = {dq_in[0], dq_in[1], dq_in[2], dq_in[3], dq_in[4], dq_in[5], dq_in[6], dq_in[7]};
+reg [15:0] dout_keep;
 `ifdef SIM
 assign dout = dq_in[4];     // somehow in simulation data is here
 `else
     `ifdef DDR3_800
-        assign dout = dq_in[0];
+        assign dout = data_ready ? dq_in[0] : dout_keep;
+        always @(posedge pclk) if (data_ready) dout_keep <= dq_in[0];
     `else
-        assign dout = dq_in[4];
+        assign dout = data_ready ? dq_in[4] : dout_keep;
+        always @(posedge pclk) if (data_ready) dout_keep <= dq_in[4];
     `endif
 `endif
 
@@ -221,7 +224,38 @@ localparam WLEVEL_COUNT=2;
 localparam RCALIB_COUNT=2;
 `else
 localparam WLEVEL_COUNT=1;          // test this many times before a wstep passes write leveling
-localparam RCALIB_COUNT=8;          // test this many times before rclkpos/rclksel passes read calib
+
+//DB: 20231205 original: 
+//       working:                 1,3,4,8,10
+//       not working, hangs:      2,5,7,9,12,13,14,16
+//       not working wrong data:  6,11,15
+
+//DB: 20231206: W=working, H=hangs on start, B=bad data read, <XY> X=clkpos, Y=clksel
+//  all working report WSTEP=0c
+//  1   W   <07>
+//  2   W   <07>
+//  3   H
+//  4   W   <07>
+//  5   W   <07>
+//  6   W   <07>
+//  7   W   <07>    - flaky reset, sometimes sticks at Init..SDRAM line
+//  8   W   <07>    - flaky reset
+//  9   H
+//  10  H
+//  11  W   <07>
+//  12  H
+//  13  W   <07>    - occassionally gets stuck at Init..SDRAM
+//  14  H
+//  15  H
+//  16  B   <07>    - read back high byte as 0
+
+
+
+
+localparam RCALIB_COUNT=10;          // test this many times before rclkpos/rclksel passes read calib
+
+
+//localparam RCALIB_COUNT=3;          // somehow 3 works for the dock
 `endif
 
 //
@@ -529,7 +563,7 @@ always @(posedge pclk) begin
         {READ_CALIB, FIVEB'(RCD/4)}: begin
             // issue read
             $display("rclkpos=%d, rclksel=%d", rclkpos, rclksel);
-            {nRAS[2], nCAS[2], nWE[2]} <= CMD_Read;
+            {nRAS[0], nCAS[0], nWE[0]} <= CMD_Read;
             A[2][12] <= 1'b1;                   // BL8 burst length
             A[2][10] <= 1'b0;                   // NO auto precharge
             A[2][9:0] <= 0;                     // row address=0

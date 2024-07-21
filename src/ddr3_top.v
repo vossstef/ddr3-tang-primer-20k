@@ -1,5 +1,6 @@
 //
-// DDR3 test top level @ 100Mhz
+// DDR3 test top level 
+// DDR3 running at @ 315Mhz and access @78Mhz (1:4)
 //
 
 `timescale 1ps /1ps
@@ -7,9 +8,8 @@
 module ddr3_top
 (
     input sys_clk,
-    input sys_resetn,
+    input sys_resetn, // Key S2
 
-    input d7,
 
 	inout  [15:0] DDR3_DQ,   // 16 bit bidirectional data bus
 	inout  [1:0] DDR3_DQS,   // DQ strobe for high and low bytes
@@ -23,22 +23,14 @@ module ddr3_top
 	output DDR3_nRESET,
 	output DDR3_CKE,
     output DDR3_ODT,
-    output [1:0] DDR3_DM,
+    output [1:0] DDR3_DQM,
 
-    output [7:0] led,
-    output [7:0] led2,
+    output [5:0] led,
 
     output uart_txp
 );
 
 reg start = 1'b1;      
-`ifdef D7_TO_START
-    // switch d7 on to start running
-    always @(posedge clk) begin
-        if (d7) start <= 1;
-        if (~sys_resetn) start <= 0;
-    end
-`endif
 
 reg rd, wr, refresh;
 reg [25:0] addr;
@@ -46,17 +38,17 @@ reg [15:0] din;
 wire [127:0] dout128;
 wire [15:0] dout;
 
-localparam FREQ=99_800_000;
+localparam FREQ=78_750_000;
 
 localparam [25:0] START_ADDR = 26'h0;
 localparam [25:0] TOTAL_SIZE = 8*1024*1024;       // Test 8MB
 //localparam [25:0] TOTAL_SIZE = 32*1024*1024;       // Test 64MB
 
 Gowin_rPLL pll(
-    .clkout(clk_x4),    // 398.25 Mhz
+    .clkout(clk_x4),    // 315Mhz
     .clkoutp(clk_ck),   // 90-degree shifted
     .lock(lock),        
-    .clkoutd(clk),      // 99.56 Mhz
+    .clkoutd(clk),      // 78.75 Mhz
     .clkin(sys_clk)     // 27 Mhz
 );
 
@@ -85,7 +77,7 @@ ddr3_controller #(.ROW_WIDTH(13), .COL_WIDTH(10)) u_ddr3 (
     .DDR3_CK(DDR3_CK),
     .DDR3_CKE(DDR3_CKE),
     .DDR3_ODT(DDR3_ODT),
-    .DDR3_DM(DDR3_DM)
+    .DDR3_DM(DDR3_DQM)
 );
 
 localparam INIT = 0;
@@ -100,8 +92,9 @@ localparam WRITE_BLOCK = 8;
 localparam VERIFY_BLOCK = 9;
 localparam WIPE = 10;
 localparam FINISH = 11;
+localparam RESET = 12;
 
-reg [7:0] state, end_state;
+reg [3:0] state, end_state;
 reg [7:0] work_counter; // 10ms per state to give UART time to print one line of message
 reg [7:0] latency_write1, latency_write2, latency_read;
 
@@ -147,21 +140,34 @@ reg wlevel_done = 0;
 reg rlevel_done = 0;
 reg [7:0] read_level_cnt;
 
+//LEDs on Tang primer dock
+assign led = ~{state[3:0], read_calib_done, write_level_done}; 
+
 // LED module in right-bottom PMOD
-assign led = ~{state[3:0], busy, error_bit, read_calib_done, write_level_done}; 
-assign led2 = ~wstep;       // for write leveling
+//assign led = ~{state[3:0], busy, error_bit, read_calib_done, write_level_done}; 
+//assign led2 = ~wstep;       // for write leveling
 //assign led2 = ~{read_calib_done, 2'b0, rclkpos[1:0], rclksel[2:0]};   // for read calib
 
 typedef logic [7:0] BYTE;
 typedef logic [25:0] ADDR;
 
 always @(posedge clk) begin
-    wr <= 0; rd <= 0; refresh <= 0; refresh_executed <= 0;
-    work_counter <= work_counter + 1;
-    tick_counter <= tick_counter == 0 ? 0 : tick_counter - 20'd1;
-    tick <= tick_counter == 20'd1;
+    if (~sys_resetn) begin
+        error_bit <= 1'b0;
+        tick <= 1'b0;
+        tick_counter <= 20'd100_000;        // wait 1ms for everything to initialize
+        latency_write1 <= 0; latency_write2 <= 0; latency_read <= 0;
+        refresh_count <= 0;
+        state <= RESET;
+    end else begin
+        wr <= 0; rd <= 0; refresh <= 0; refresh_executed <= 0;
+        work_counter <= work_counter + 1;
+        tick_counter <= tick_counter == 0 ? 0 : tick_counter - 20'd1;
+        tick <= tick_counter == 20'd1;
 
     case (state)
+        RESET:
+            state <= INIT;
         // wait for busy==0 (controller initialization done)
         INIT: if (lock && sys_resetn && !busy && start) begin
             state <= PRINT_STATUS;
@@ -178,7 +184,7 @@ always @(posedge clk) begin
         WRITE1: if (tick) begin 
             wr <= 1'b1;
             addr <= 26'h0000;
-            din <= 16'h1122;
+            din <= 16'h1234;
             work_counter <= 0;
             state <= WRITE2;      /* WRITE2 */
             tick_counter <= 20'd100_000;        // 1ms
@@ -186,7 +192,7 @@ always @(posedge clk) begin
         WRITE2: if (tick) begin 
             wr <= 1'b1;
             addr <= 26'h0001;
-            din <= 16'h3344;
+            din <= 16'h5678;
             work_counter <= 0;
             state <= WRITE3;      /* WRITE2 */
             tick_counter <= 20'd100_000;        // 1ms
@@ -197,7 +203,7 @@ always @(posedge clk) begin
             latency_write1 <= work_counter[7:0]; 
             wr <= 1'b1;
             addr <= 26'h0002;
-            din <= 16'h5566;
+            din <= 16'hABCD;
             state <= READ_START;
             work_counter <= 0;
             debug_cycle <= 0;
@@ -213,7 +219,7 @@ always @(posedge clk) begin
             result_to_print <= 0;
             if (tick) begin
                 // issue one read command every tick
-                if (addr[15:0] == 16'h0003) begin
+                if (addr[15:0] == 16'h0007) begin
                     tick_counter <= 20'd200_000;    // wait 2ms
                     state <= READ_DONE;
                 end else begin
@@ -323,19 +329,7 @@ always @(posedge clk) begin
                 end
             end
         end
-
-
-
-
     endcase
-
-    if (~sys_resetn) begin
-        error_bit <= 1'b0;
-        tick <= 1'b0;
-        tick_counter <= 20'd100_000;        // wait 1ms for everything to initialize
-        latency_write1 <= 0; latency_write2 <= 0; latency_read <= 0;
-        refresh_count <= 0;
-        state <= INIT;
     end
 end
 
@@ -397,7 +391,8 @@ always@(posedge clk)begin
         8'd2: `print(addr_read[15:0], 2);
         8'd3: `print("=", STR);
         8'd4: `print(actual, 2);
-//        8'd4: `print(actual128[127:0], 16);      // print everything for debug
+//        8'd5: `print(" ", STR);
+//        8'd6: `print(actual128[127:0], 16);      // print everything for debug
         endcase
         print_counters <= print_counters == 8'd255 ? 0 : print_counters + 1;
     end
