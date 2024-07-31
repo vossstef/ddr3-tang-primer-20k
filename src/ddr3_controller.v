@@ -45,7 +45,7 @@ module ddr3_controller
     // DDR3 side interface
     inout [15:0]      DDR3_DQ,
     inout [1:0]       DDR3_DQS,
-    output[ROW_WIDTH-1:0]  DDR3_A,
+    output[13:0]      DDR3_A,
     output[BANK_WIDTH-1:0] DDR3_BA,
 
     output            DDR3_nRAS,
@@ -72,8 +72,8 @@ module ddr3_controller
     input      [15:0] din,          // 16-bit data input
     output    [15:0]  dout,         // word output
     output    [127:0] dout128,      // 128-bit data output
-    output reg        data_ready = 1'b0,   // available 6 cycles after wr is set
-    output reg        busy = 1'b1,  // 0: ready for next command
+    output reg        data_ready,   // = 1'b0,  // available 6 cycles after wr is set
+    output reg        busy,         // = 1'b1,  // 0: ready for next command
 
     // Write leveling. This is done after mode registers are set.
     output            write_level_done,  // 1 means write leveling is successful for this DQS
@@ -224,37 +224,7 @@ localparam WLEVEL_COUNT=2;
 localparam RCALIB_COUNT=2;
 `else
 localparam WLEVEL_COUNT=1;          // test this many times before a wstep passes write leveling
-
-//DB: 20231205 original: 
-//       working:                 1,3,4,8,10
-//       not working, hangs:      2,5,7,9,12,13,14,16
-//       not working wrong data:  6,11,15
-
-//DB: 20231206: W=working, H=hangs on start, B=bad data read, <XY> X=clkpos, Y=clksel
-//  all working report WSTEP=0c
-//  1   W   <07>
-//  2   W   <07>
-//  3   H
-//  4   W   <07>
-//  5   W   <07>
-//  6   W   <07>
-//  7   W   <07>    - flaky reset, sometimes sticks at Init..SDRAM line
-//  8   W   <07>    - flaky reset
-//  9   H
-//  10  H
-//  11  W   <07>
-//  12  H
-//  13  W   <07>    - occassionally gets stuck at Init..SDRAM
-//  14  H
-//  15  H
-//  16  B   <07>    - read back high byte as 0
-
-
-
-
-localparam RCALIB_COUNT=10;          // test this many times before rclkpos/rclksel passes read calib
-
-
+localparam RCALIB_COUNT=16;          // test this many times before rclkpos/rclksel passes read calib
 //localparam RCALIB_COUNT=3;          // somehow 3 works for the dock
 `endif
 
@@ -265,7 +235,7 @@ always @(posedge pclk) begin
   if (rst_lock_n) begin
     cycle <= cycle == 5'd31 ? 5'd31 : cycle + 4'd1;
     tick <= tick_counter == 16'd1;
-    tick_counter <= tick_counter == 0 ? 0 : tick_counter - 16'd1;
+    tick_counter <= tick_counter == 0 ? 17'd0 : tick_counter - 17'd1;
 
     // defaults
     {nRAS[0], nCAS[0], nWE[0]} <= CMD_NOP; {nRAS[1], nCAS[1], nWE[1]} <= CMD_NOP;
@@ -284,14 +254,14 @@ always @(posedge pclk) begin
 `ifdef SIM
             tick_counter <= 17'd19;
 `else
-            tick_counter <= 500 * USEC + 20;
+            tick_counter <= 17'(500 * USEC + 20);
 `endif
             state <= CKE_WAIT;
         end
         
         // CKE on after 500 us before 
         {CKE_WAIT, 5'bxxxxx} : begin
-            if (tick_counter == 16'd15)
+            if (tick_counter == 17'd15)
                 DDR3_CKE <= 1'b1;       // tXPR (120ns) between CKE and MRS
             if (tick) begin
                 state <= CONFIG;
@@ -325,7 +295,7 @@ always @(posedge pclk) begin
 `ifdef SIM
             tick_counter <= 16'd2;      // 1024 nCK (256 clk), set to 2 for simulation
 `else
-            tick_counter <= 16'd512 + 2;
+            tick_counter <= 17'd512 + 17'd2;
 `endif
             state <= ZQCL;
         end
@@ -343,8 +313,8 @@ always @(posedge pclk) begin
             BA[0] <= addr[ROW_WIDTH+COL_WIDTH+BANK_WIDTH-1 : ROW_WIDTH+COL_WIDTH];    // bank id
             A[0] <= addr[ROW_WIDTH+COL_WIDTH-1:COL_WIDTH];      // 12-bit row address
             state <= rd ? READ : WRITE;
-            if (rd) cnt_read <= cnt_read == 8'hff ? 8'hff : cnt_read + 1;
-            if (wr) cnt_write <= cnt_write == 8'hff ? 8'hff : cnt_write + 1;
+            if (rd) cnt_read <= cnt_read == 8'hff ? 8'hff : 8'(cnt_read + 8'd1);
+            if (wr) cnt_write <= cnt_write == 8'hff ? 8'hff : 8'(cnt_write + 8'd1);
             cycle <= 4'd1;
             busy <= 1'b1;
             if (rd) dqs_hold <= 1'b1;       // reset WPOINT/RPOINT
@@ -412,7 +382,15 @@ always @(posedge pclk) begin
             dqs_oen <= 4'b1110;
 
             // DQ output
-            dq_out[6] <= 0; dq_out[7] <= din;
+            dq_out[0] <= din;
+            dq_out[1] <= din;
+            dq_out[2] <= din;
+            dq_out[3] <= din;
+            dq_out[4] <= din;
+            dq_out[5] <= din;
+
+            dq_out[6] <= 0; 
+            dq_out[7] <= din;
             dq_oen <= 4'b1110;
 
             // DM, umask the word we are writing to
@@ -425,8 +403,16 @@ always @(posedge pclk) begin
             dqs_oen <= 4'b0011;
 
             // DQ output
-            dq_out[0] <= din; dq_out[1] <= din;
-            dq_out[2] <= din; dq_out[3] <= 0;
+            dq_out[0] <= din; 
+            dq_out[1] <= din;
+            dq_out[2] <= din; 
+            dq_out[3] <= 0;
+
+            dq_out[4] <= din;
+            dq_out[5] <= din;
+            dq_out[6] <= din;
+            dq_out[7] <= din;
+
             dq_oen <= 4'b0011;
 
             dm_out[0] <= !(addr[1:0] == 2'b01);
@@ -445,8 +431,10 @@ always @(posedge pclk) begin
             dqs_oen <= 4'b1100;
 
             // DQ output
-            dq_out[4] <= 0; dq_out[5] <= din;
-            dq_out[6] <= din; dq_out[7] <= din;
+            dq_out[4] <= 0; 
+            dq_out[5] <= din;
+            dq_out[6] <= din; 
+            dq_out[7] <= din;
             dq_oen <= 4'b1100;
 
             dm_out[5] <= !(addr[1:0] == 2'b00);
@@ -459,7 +447,8 @@ always @(posedge pclk) begin
             dqs_oen <= 4'b0111;
 
             // DQ output
-            dq_out[0] <= din; dq_out[1] <= 0;
+            dq_out[0] <= din; 
+            dq_out[1] <= 0;
             dq_oen <= 4'b0111;
 
             dm_out[0] <= !(addr[1:0] == 2'b11);
@@ -563,7 +552,7 @@ always @(posedge pclk) begin
         {READ_CALIB, FIVEB'(RCD/4)}: begin
             // issue read
             $display("rclkpos=%d, rclksel=%d", rclkpos, rclksel);
-            {nRAS[0], nCAS[0], nWE[0]} <= CMD_Read;
+            {nRAS[2], nCAS[2], nWE[2]} <= CMD_Read;
             A[2][12] <= 1'b1;                   // BL8 burst length
             A[2][10] <= 1'b0;                   // NO auto precharge
             A[2][9:0] <= 0;                     // row address=0
@@ -605,7 +594,7 @@ always @(posedge pclk) begin
 `ifdef SIM
         tick_counter <= 16'd1;          // initial 500us delay, 140ns in simulation
 `else
-        tick_counter <= 16'd60_000;     // initial 500us delay
+        tick_counter <= 17'd60_000;     // initial 500us delay
 `endif
         tick <= 0;
         cycle <= 0;
@@ -653,11 +642,16 @@ assign dlllock = 1'b1;
 // SCAL_EN=="false" means constant output of 
 // Every DLL step is about 0.025 ns. For 100Mhz, dllstep should be roughly 0.625/0.025=25
 DLL #(
-    .SCAL_EN("true"), .CODESCAL("101")     // 68-degree phase shift
+    .SCAL_EN("true"), 
+    .CODESCAL("101")     // 68-degree phase shift
 //    .SCAL_EN("false")                     // 90° phase shift
 ) dll(
-    .CLKIN(fclk), .RESET(~resetn), .STOP(0), 
-    .UPDNCNTL(1'b0), .STEP(dllstep), .LOCK(dlllock)
+    .CLKIN(fclk),
+    .RESET(~resetn),
+    .STOP(1'b0), 
+    .UPDNCNTL(1'b0),
+    .STEP(dllstep),
+    .LOCK(dlllock)
 );
 `endif
 
@@ -672,15 +666,31 @@ generate
     // DQSW270 is fclk delayed WSTEP+DLLSTEP+180-degrees.
     for (genvar i0 = 0; i0 < 2; i0++) begin : gen_dqs_controller
         DQS #(
-            .DQS_MODE("X4"), .HWL("false")       // HWL is related to WL&RL
+            .DQS_MODE("X4"), 
+            .HWL("false")       // HWL is related to WL&RL
             // .DQS_MODE("X4"), .HWL("true")   
         ) u_dqs (
-            .FCLK(fclk), .PCLK(pclk), .DQSIN(DDR3_DQS[i0]), .RESET(~rst_lock_n), .HOLD(dqs_hold), 
-            .RLOADN(1'b0), .WLOADN(1'b0), .RMOVE(1'b0), .WMOVE(1'b0),
-            .DLLSTEP(dllstep), .WSTEP(wstep),        // 0.625/0.025
-            .RCLKSEL(rclksel), .READ(dqs_read),
-            .DQSR90(clk_dqsr[i0]), .WPOINT(dqs_waddr[i0]), .RPOINT(dqs_raddr[i0]), 
-            .DQSW0(clk_dqsw[i0]), .DQSW270(clk_dqsw270[i0]), .RBURST(rburst[i0])
+            .FCLK(fclk), 
+            .PCLK(pclk), 
+            .DQSIN(DDR3_DQS[i0]), 
+            .RESET(~rst_lock_n), 
+            .HOLD(dqs_hold), 
+            .RLOADN(1'b0), 
+            .WLOADN(1'b0), 
+            .RMOVE(1'b0), 
+            .WMOVE(1'b0),
+            .DLLSTEP(dllstep), 
+            .WSTEP(wstep),        // 0.625/0.025
+            .RCLKSEL(rclksel), 
+            .READ(dqs_read),
+            .DQSR90(clk_dqsr[i0]), 
+            .WPOINT(dqs_waddr[i0]), 
+            .RPOINT(dqs_raddr[i0]), 
+            .DQSW0(clk_dqsw[i0]), 
+            .DQSW270(clk_dqsw270[i0]), 
+            .RBURST(rburst[i0]),
+            .RDIR(1'b0),
+            .WDIR(1'b0)
         );
     end
 endgenerate
@@ -688,13 +698,26 @@ endgenerate
 // 2*CK speed in/out for data(DQ), data strobe(DQS) and data mask(DM)
 wire [15:0] dq_buf, dq_buf_oen;        // I/O buffer internal use
 generate
-    for (genvar i1 = 0; i1 < 16; i1++) begin : gen_dq
+    for (genvar i1 = 0; i1 < 16; i1 = i1 + 1'd1) begin : gen_dq
         OSER8_MEM #(.TCLK_SOURCE("DQSW270")) oser_dq(
-            .D0(dq_out[0][i1]), .D1(dq_out[1][i1]), .D2(dq_out[2][i1]), .D3(dq_out[3][i1]), 
-            .D4(dq_out[4][i1]), .D5(dq_out[5][i1]), .D6(dq_out[6][i1]), .D7(dq_out[7][i1]), 
-            .TX0(dq_oen[0]), .TX1(dq_oen[1]), .TX2(dq_oen[2]), .TX3(dq_oen[3]), 
-            .FCLK(fclk), .PCLK(pclk), .TCLK(clk_dqsw270[i1/8]), .RESET(~rst_lock_n|| ~dlllock), 
-            .Q0(dq_buf[i1]), .Q1(dq_buf_oen[i1])
+            .D0(dq_out[0][i1]), 
+            .D1(dq_out[1][i1]), 
+            .D2(dq_out[2][i1]), 
+            .D3(dq_out[3][i1]), 
+            .D4(dq_out[4][i1]), 
+            .D5(dq_out[5][i1]), 
+            .D6(dq_out[6][i1]), 
+            .D7(dq_out[7][i1]), 
+            .TX0(dq_oen[0]), 
+            .TX1(dq_oen[1]), 
+            .TX2(dq_oen[2]), 
+            .TX3(dq_oen[3]), 
+            .FCLK(fclk), 
+            .PCLK(pclk), 
+            .TCLK(clk_dqsw270[i1/8]), 
+            .RESET(~rst_lock_n|| ~dlllock), 
+            .Q0(dq_buf[i1]), 
+            .Q1(dq_buf_oen[i1])
         );
         assign DDR3_DQ[i1] = dq_buf_oen[i1] ? 1'bz : dq_buf[i1];
 
@@ -724,10 +747,27 @@ generate
         assign DDR3_DQS[i2] = dqs_buf_oen[i2] ? 1'bz : dqs_buf[i2];
 
         // DM is aligned with DQ
-        OSER8_MEM #(.TCLK_SOURCE("DQSW270")) oser_dm(
-            .D0(dm_out[0]), .D1(dm_out[1]), .D2(dm_out[2]), .D3(dm_out[3]), 
-            .D4(dm_out[4]), .D5(dm_out[5]), .D6(dm_out[6]), .D7(dm_out[7]), 
-            .FCLK(fclk), .PCLK(pclk), .TCLK(clk_dqsw270[i2]), .RESET(~rst_lock_n), .Q0(DDR3_DM[i2])
+        OSER8_MEM #(
+            .TCLK_SOURCE("DQSW270")
+            ) oser_dm(
+            .D0(dm_out[0]), 
+            .D1(dm_out[1]), 
+            .D2(dm_out[2]), 
+            .D3(dm_out[3]), 
+            .D4(dm_out[4]), 
+            .D5(dm_out[5]), 
+            .D6(dm_out[6]), 
+            .D7(dm_out[7]), 
+            .TX0(1'b0),
+            .TX1(1'b0),
+            .TX2(1'b0),
+            .TX3(1'b0),
+            .FCLK(fclk), 
+            .PCLK(pclk), 
+            .TCLK(clk_dqsw270[i2]), 
+            .RESET(~rst_lock_n), 
+            .Q0(DDR3_DM[i2]),
+            .Q1()
         );
     end
 endgenerate
@@ -735,18 +775,30 @@ endgenerate
 // CK speed output for nRAS, nCAS, nWE
 OSER8 oser_nras(
     .D0(nRAS[0]), .D1(nRAS[0]), .D2(nRAS[1]), .D3(nRAS[1]), 
-    .D4(nRAS[2]), .D5(nRAS[2]), .D6(nRAS[3]), .D7(nRAS[3]), 
-    .FCLK(fclk), .PCLK(pclk), .RESET(~rst_lock_n), .Q0(DDR3_nRAS)
+    .D4(nRAS[2]), .D5(nRAS[2]), .D6(nRAS[3]), .D7(nRAS[3]),
+            .TX0(1'b0),
+            .TX1(1'b0),
+            .TX2(1'b0),
+            .TX3(1'b0), 
+    .FCLK(fclk), .PCLK(pclk), .RESET(~rst_lock_n), .Q0(DDR3_nRAS),.Q1()
 );
 OSER8 oser_ncas(
     .D0(nCAS[0]), .D1(nCAS[0]), .D2(nCAS[1]), .D3(nCAS[1]), 
     .D4(nCAS[2]), .D5(nCAS[2]), .D6(nCAS[3]), .D7(nCAS[3]), 
-    .FCLK(fclk), .PCLK(pclk), .RESET(~rst_lock_n), .Q0(DDR3_nCAS)
+            .TX0(1'b0),
+            .TX1(1'b0),
+            .TX2(1'b0),
+            .TX3(1'b0),
+    .FCLK(fclk), .PCLK(pclk), .RESET(~rst_lock_n), .Q0(DDR3_nCAS),.Q1()
 );
 OSER8 oser_nwe(
     .D0(nWE[0]), .D1(nWE[0]), .D2(nWE[1]), .D3(nWE[1]), 
     .D4(nWE[2]), .D5(nWE[2]), .D6(nWE[3]), .D7(nWE[3]), 
-    .FCLK(fclk), .PCLK(pclk), .RESET(~rst_lock_n), .Q0(DDR3_nWE)
+            .TX0(1'b0),
+            .TX1(1'b0),
+            .TX2(1'b0),
+            .TX3(1'b0),
+    .FCLK(fclk), .PCLK(pclk), .RESET(~rst_lock_n), .Q0(DDR3_nWE),.Q1()
 );
 
 // Address lines (CK speed)
@@ -755,10 +807,19 @@ generate
         OSER8 oser_a(
             .D0(A[0][i3]), .D1(A[0][i3]), .D2(A[1][i3]), .D3(A[1][i3]), 
             .D4(A[2][i3]), .D5(A[2][i3]), .D6(A[3][i3]), .D7(A[3][i3]), 
-            .FCLK(fclk), .PCLK(pclk), .RESET(~rst_lock_n), .Q0(DDR3_A[i3])
+            .TX0(1'b0),
+            .TX1(1'b0),
+            .TX2(1'b0),
+            .TX3(1'b0),
+            .FCLK(fclk), 
+            .PCLK(pclk), 
+            .RESET(~rst_lock_n), 
+            .Q0(DDR3_A[i3])
         );
     end
 endgenerate
+
+assign DDR3_A[13] = 1'b0;
 
 // BA lines (CK speed)
 generate
@@ -766,7 +827,14 @@ generate
         OSER8 oser_ba(
             .D0(BA[0][i4]), .D1(BA[0][i4]), .D2(BA[1][i4]), .D3(BA[1][i4]), 
             .D4(BA[2][i4]), .D5(BA[2][i4]), .D6(BA[3][i4]), .D7(BA[3][i4]), 
-            .FCLK(fclk), .PCLK(pclk), .RESET(~rst_lock_n), .Q0(DDR3_BA[i4])
+            .TX0(1'b0),
+            .TX1(1'b0),
+            .TX2(1'b0),
+            .TX3(1'b0),
+            .FCLK(fclk), 
+            .PCLK(pclk), 
+            .RESET(~rst_lock_n), 
+            .Q0(DDR3_BA[i4])
         );
     end
 endgenerate
