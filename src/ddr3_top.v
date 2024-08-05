@@ -160,12 +160,22 @@ typedef logic [7:0] BYTE;
 typedef logic [25:0] ADDR;
 
 always @(posedge clk) begin
-    wr <= 0; rd <= 0; refresh <= 0; refresh_executed <= 0;
-    work_counter <= work_counter + 1;
-    tick_counter <= tick_counter == 0 ? 0 : tick_counter - 20'd1;
-    tick <= tick_counter == 20'd1;
+    if (~sys_resetn) begin
+        error_bit <= 1'b0;
+        tick <= 1'b0;
+        tick_counter <= 20'd100_000;        // wait 1ms for everything to initialize
+        latency_write1 <= 0; latency_write2 <= 0; latency_read <= 0;
+        refresh_count <= 0;
+        state <= RESET;
+    end else begin
+        wr <= 0; rd <= 0; refresh <= 0; refresh_executed <= 0;
+        work_counter <= work_counter + 1;
+        tick_counter <= tick_counter == 0 ? 0 : tick_counter - 20'd1;
+        tick <= tick_counter == 20'd1;
 
     case (state)
+        RESET:
+            state <= INIT;
         // wait for busy==0 (controller initialization done)
         INIT: if (lock && sys_resetn && !busy && start) begin
             state <= PRINT_STATUS;
@@ -182,7 +192,7 @@ always @(posedge clk) begin
         WRITE1: if (tick) begin 
             wr <= 1'b1;
             addr <= 26'h0000;
-            din <= 16'h1122;
+            din <= 16'h1234;
             work_counter <= 0;
             state <= WRITE2;      /* WRITE2 */
             tick_counter <= 20'd100_000;        // 1ms
@@ -190,7 +200,7 @@ always @(posedge clk) begin
         WRITE2: if (tick) begin 
             wr <= 1'b1;
             addr <= 26'h0001;
-            din <= 16'h3344;
+            din <= 16'h5678;
             work_counter <= 0;
             state <= WRITE3;      /* WRITE2 */
             tick_counter <= 20'd100_000;        // 1ms
@@ -201,7 +211,7 @@ always @(posedge clk) begin
             latency_write1 <= work_counter[7:0]; 
             wr <= 1'b1;
             addr <= 26'h0002;
-            din <= 16'h5566;
+            din <= 16'hABCD;
             state <= READ_START;
             work_counter <= 0;
             debug_cycle <= 0;
@@ -217,7 +227,7 @@ always @(posedge clk) begin
             result_to_print <= 0;
             if (tick) begin
                 // issue one read command every tick
-                if (addr[15:0] == 16'h0003) begin
+                if (addr[15:0] == 16'h0007) begin
                     tick_counter <= 20'd200_000;    // wait 2ms
                     state <= READ_DONE;
                 end else begin
@@ -327,19 +337,7 @@ always @(posedge clk) begin
                 end
             end
         end
-
-
-
-
     endcase
-
-    if (~sys_resetn) begin
-        error_bit <= 1'b0;
-        tick <= 1'b0;
-        tick_counter <= 20'd100_000;        // wait 1ms for everything to initialize
-        latency_write1 <= 0; latency_write2 <= 0; latency_read <= 0;
-        refresh_count <= 0;
-        state <= INIT;
     end
 end
 
