@@ -25,7 +25,7 @@ module ddr3_top
     output DDR3_ODT,
     output [1:0] DDR3_DQM,
 
-    output [5:0] led,
+    output [3:0] led,
 
     output uart_txp
 );
@@ -141,7 +141,7 @@ reg rlevel_done = 0;
 reg [7:0] read_level_cnt;
 
 //LEDs on Tang primer dock
-assign led = ~{state[3:0], read_calib_done, write_level_done}; 
+assign led = ~{2'b000, read_calib_done, write_level_done}; 
 
 // LED module in right-bottom PMOD
 //assign led = ~{state[3:0], busy, error_bit, read_calib_done, write_level_done}; 
