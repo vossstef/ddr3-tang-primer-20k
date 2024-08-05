@@ -9,8 +9,6 @@ module ddr3_top
     input sys_clk,
     input sys_resetn,
 
-    input d7,
-
 	inout  [15:0] DDR3_DQ,   // 16 bit bidirectional data bus
 	inout  [1:0] DDR3_DQS,   // DQ strobe for high and low bytes
 	output [13:0] DDR3_A,    // 14 bit multiplexed address bus
@@ -32,14 +30,6 @@ module ddr3_top
 );
 
 reg start = 1'b1;      
-`ifdef D7_TO_START
-    // switch d7 on to start running
-    always @(posedge clk) begin
-        if (d7) start <= 1;
-        if (~sys_resetn) start <= 0;
-    end
-`endif
-
 reg rd, wr, refresh;
 reg [25:0] addr;
 reg [15:0] din;
@@ -51,6 +41,16 @@ localparam FREQ=99_800_000;
 localparam [25:0] START_ADDR = 26'h0;
 localparam [25:0] TOTAL_SIZE = 8*1024*1024;       // Test 8MB
 //localparam [25:0] TOTAL_SIZE = 32*1024*1024;       // Test 64MB
+
+
+wire clk_x4;
+wire clk_ck;
+wire clk;
+wire lock;
+wire data_ready;
+wire busy;
+wire write_level_done;
+wire read_calib_done;
 
 Gowin_rPLL pll(
     .clkout(clk_x4),    // 398.25 Mhz

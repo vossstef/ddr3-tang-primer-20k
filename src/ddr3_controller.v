@@ -72,8 +72,8 @@ module ddr3_controller
     input      [15:0] din,          // 16-bit data input
     output    [15:0]  dout,         // word output
     output    [127:0] dout128,      // 128-bit data output
-    output reg        data_ready = 1'b0,   // available 6 cycles after wr is set
-    output reg        busy = 1'b1,  // 0: ready for next command
+    output reg        data_ready,   // available 6 cycles after wr is set
+    output reg        busy,  // 0: ready for next command
 
     // Write leveling. This is done after mode registers are set.
     output            write_level_done,  // 1 means write leveling is successful for this DQS
@@ -622,7 +622,7 @@ DLL #(
     .SCAL_EN("true"), .CODESCAL("101")     // 68-degree phase shift
 //    .SCAL_EN("false")                     // 90° phase shift
 ) dll(
-    .CLKIN(fclk), .RESET(~resetn), .STOP(0), 
+    .CLKIN(fclk), .RESET(~resetn), .STOP(1'b0), 
     .UPDNCNTL(1'b0), .STEP(dllstep), .LOCK(dlllock)
 );
 `endif
