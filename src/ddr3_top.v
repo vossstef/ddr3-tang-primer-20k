@@ -23,8 +23,7 @@ module ddr3_top
     output DDR3_ODT,
     output [1:0] DDR3_DM,
 
-    output [7:0] led,
-    output [7:0] led2,
+    output [3:0] led,
 
     output uart_txp
 );
@@ -100,6 +99,7 @@ localparam WRITE_BLOCK = 8;
 localparam VERIFY_BLOCK = 9;
 localparam WIPE = 10;
 localparam FINISH = 11;
+localparam RESET = 12;
 
 reg [7:0] state, end_state;
 reg [7:0] work_counter; // 10ms per state to give UART time to print one line of message
@@ -147,9 +147,13 @@ reg wlevel_done = 0;
 reg rlevel_done = 0;
 reg [7:0] read_level_cnt;
 
+//LEDs on Tang primer dock
+assign led = ~{busy, error_bit, read_calib_done, write_level_done};
+
+
 // LED module in right-bottom PMOD
-assign led = ~{state[3:0], busy, error_bit, read_calib_done, write_level_done}; 
-assign led2 = ~wstep;       // for write leveling
+//assign led = ~{state[3:0], busy, error_bit, read_calib_done, write_level_done}; 
+//assign led2 = ~wstep;       // for write leveling
 //assign led2 = ~{read_calib_done, 2'b0, rclkpos[1:0], rclksel[2:0]};   // for read calib
 
 typedef logic [7:0] BYTE;
@@ -397,7 +401,8 @@ always@(posedge clk)begin
         8'd2: `print(addr_read[15:0], 2);
         8'd3: `print("=", STR);
         8'd4: `print(actual, 2);
-//        8'd4: `print(actual128[127:0], 16);      // print everything for debug
+        8'd5: `print(" ", STR);
+        8'd6: `print(actual128[127:0], 16);      // print everything for debug
         endcase
         print_counters <= print_counters == 8'd255 ? 0 : print_counters + 1;
     end
