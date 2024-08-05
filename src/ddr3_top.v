@@ -23,12 +23,11 @@ module ddr3_top
     output DDR3_ODT,
     output [1:0] DDR3_DM,
 
-    output [3:0] led,
+    output reg [5:0] led,
 
     output uart_txp
 );
 
-reg start = 1'b1;      
 reg rd, wr, refresh;
 reg [25:0] addr;
 reg [15:0] din;
@@ -148,8 +147,7 @@ reg rlevel_done = 0;
 reg [7:0] read_level_cnt;
 
 //LEDs on Tang primer dock
-assign led = ~{busy, error_bit, read_calib_done, write_level_done};
-
+//assign led = ~{2'b000, read_calib_done, write_level_done}; 
 
 // LED module in right-bottom PMOD
 //assign led = ~{state[3:0], busy, error_bit, read_calib_done, write_level_done}; 
@@ -167,7 +165,10 @@ always @(posedge clk) begin
         latency_write1 <= 0; latency_write2 <= 0; latency_read <= 0;
         refresh_count <= 0;
         state <= RESET;
+        led <=6'b11_1111;
     end else begin
+        led <= ~{2'b00, busy, error_bit, read_calib_done, write_level_done}; 
+
         wr <= 0; rd <= 0; refresh <= 0; refresh_executed <= 0;
         work_counter <= work_counter + 1;
         tick_counter <= tick_counter == 0 ? 0 : tick_counter - 20'd1;
@@ -177,7 +178,7 @@ always @(posedge clk) begin
         RESET:
             state <= INIT;
         // wait for busy==0 (controller initialization done)
-        INIT: if (lock && sys_resetn && !busy && start) begin
+        INIT: if (lock && sys_resetn && !busy) begin
             state <= PRINT_STATUS;
             tick_counter <= 20'd100_000;
         end
@@ -423,7 +424,7 @@ always@(posedge clk)begin
 //        8'd20: `print(refresh_addr[23:0], 3);
         8'd255: `print("\n\n", STR);
         endcase
-        print_stat <= print_stat == 8'd255 ? 0 : print_stat + 1;
+        print_stat <= print_stat == 8'd255 ? 0 : 8'(print_stat + 8'd1);
     end
 end
 
