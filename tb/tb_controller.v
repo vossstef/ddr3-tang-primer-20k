@@ -9,6 +9,12 @@ module tb;
 
     // sg125=DDR3-1600
     `define sg125
+    `define SIM
+    `define den1024Mb
+  //  `define sg25
+    `define x16
+
+
     `include "1024Mb_ddr3_parameters.vh"
 
     // DDR3 ports

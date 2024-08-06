@@ -99,6 +99,10 @@ localparam SERDES = 16;     // SERDES round-trip latency in (OSER8 is 3 clk, IDE
     localparam USEC = 134;  // pclk <= 133Mhz
 `endif
 
+GSR gsr_inst(
+.GSRI(1'b1)
+);
+
 // Wait until DLL locked to do anything
 wire dlllock;
 wire rst_lock_n = resetn & dlllock;
@@ -122,7 +126,7 @@ typedef logic [4:0] FIVEB;
 // Debug stuff
 reg [7:0] cnt_read = 0;
 reg [7:0] cnt_write = 0;
-assign debug = {cnt_write, cnt_read, BYTE'(state)};
+
 
 // Output signals
 reg nRAS[3:0], nCAS[3:0], nWE[3:0];
@@ -218,6 +222,8 @@ reg [1:0] rburst_seen;
 reg rcalib_done = 1'b0;
 reg [3:0] rcalib_cnt = 4'b0;
 assign read_calib_done = rcalib_done;
+
+assign debug = {cnt_write, cnt_read, BYTE'(state)};
 
 `ifdef SIM
 localparam WLEVEL_COUNT=2;
