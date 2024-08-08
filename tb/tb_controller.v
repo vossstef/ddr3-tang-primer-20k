@@ -8,11 +8,11 @@
 module tb;
 
     // sg125=DDR3-1600
-    `define sg125
-    `define SIM
-    `define den1024Mb
+  //  `define sg125
+  //  `define SIM
+  //  `define den1024Mb
   //  `define sg25
-    `define x16
+  //  `define x16
 
 
     `include "1024Mb_ddr3_parameters.vh"
@@ -55,6 +55,8 @@ module tb;
 
     wire ddr_nrst;
     wire ddr_ck;
+
+    GSR GSR(.GSRI(1'b1));
 
     // Micron DDR3 memory module
     ddr3 sdramddr3_0 (

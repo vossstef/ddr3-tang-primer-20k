@@ -45,7 +45,7 @@ module ddr3_controller
     // DDR3 side interface
     inout [15:0]      DDR3_DQ,
     inout [1:0]       DDR3_DQS,
-    output[13:0]      DDR3_A,
+    output[12:0]      DDR3_A,
     output[BANK_WIDTH-1:0] DDR3_BA,
 
     output            DDR3_nRAS,
@@ -897,7 +897,7 @@ generate
     end
 endgenerate
 
-assign DDR3_A[13] = 1'b0;
+//assign DDR3_A[13] = 1'b0;
 
 // BA lines (CK speed)
 generate

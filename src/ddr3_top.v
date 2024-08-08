@@ -13,7 +13,7 @@ module ddr3_top
 
 	inout  [15:0] DDR3_DQ,   // 16 bit bidirectional data bus
 	inout  [1:0] DDR3_DQS,   // DQ strobe for high and low bytes
-	output [13:0] DDR3_A,    // 14 bit multiplexed address bus
+	output [12:0] DDR3_A,    // 14 bit multiplexed address bus
 	output [2:0] DDR3_BA,    // 3 banks
 	output DDR3_nCS,  // a single chip select
 	output DDR3_nWE,  // write enable
